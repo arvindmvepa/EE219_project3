@@ -26,39 +26,48 @@ for k in [10, 50, 100]:
 
 # PART 2
 weight_matrix_array = np.asarray(weight_matrix)
-indices_known_data = zip(*weight_matrix_array.nonzero())
-b = dict(enumerate(indices_known_data))
-N = range(len(b))
+indices_known_data = zip(*weight_matrix_array.nonzero()) # (row,column) indices of nonzero elements 
+b = dict(enumerate(indices_known_data))  # creating a dictionary {1:(row,column) 2:(row,column) ... }
+N = range(len(b))   # shuffling 
 shuffle(N)
 
+
+# dividing known points into ten sets after shuffling, take 10004 points for the last set
 lol = lambda lst, sz: [lst[i:i+sz] for i in range(0, len(lst), sz)]
 m = lol(N,10000)
+m[9] = m[9] + m[10]
+
+
 
 n_folds = 10
-k = 100
+k = 100     # k is chosen to be 100 here, in part 1 we used 10, 50 and 100
 error =[]
-for i in range(n_folds):
-    temp = np.asarray(weight_matrix)
-    keys = m[i]
-    for key in keys:
-        y = indices_known_data[key]
-        p,o = zip(y)
-        temp[p][o] = 0
-        new_weight_matrix = pd.DataFrame(temp)
+
+for i in range(n_folds):   # for all 10 sets(10 folds which has 10000 elements only last set has 10004)
+    temp = np.asarray(weight_matrix)  
+    keys = m[i]                         # get the keys of known elements in the test set
+    for key in keys:                    
+        y = indices_known_data[key]     
+        p,o = zip(y)                     # get row and column indices of known elements in test set
+        temp[p][o] = 0                   # put 0 in the weight_matrix for the elements in test set
+        new_weight_matrix = pd.DataFrame(temp)  
 
     nmf = NMF(n_components=k)
-    rating_matrix = np.multiply(weight_matrix,rating_matrix)
-    U = nmf.fit_transform(rating_matrix)
+    temp_rating_matrix = np.multiply(new_weight_matrix,rating_matrix)   # get new rating_matrix with known data, elements in test set is extrated 
+    U = nmf.fit_transform(temp_rating_matrix)                 
     V = nmf.components_
-    predicted_rating_matrix = np.dot(U, V)
+    predicted_rating_matrix = np.dot(U, V)   # our prediction rating matrix with know elements(known elements in test set extracted)
 
     sum = 0
-    for key in keys:
-        y = indices_known_data[key]
-        p,o = zip(y)
-        sum = sum + predicted_rating_matrix[p[0]][o[0]]
+    for key in keys:                         # in this for loop the elements , which have the (row,column) indices in the test set elements
+        y = indices_known_data[key]          # are summed. In other words, if we have an known element in the test set which has (row i,column j),
+        p,o = zip(y)                         # we add the element in (row i,column j) from the prediction matrix.
+        sum = sum + predicted_rating_matrix[p][o]     
 
-    error.append(abs(10000 - sum)/10000)
+    if i == 9:
+        error.append(abs(10004 - sum)/10004)     # last set has 10004 known data 
+    else:
+        error.append(abs(10000 - sum)/10000)     # others have 10000 known data points 
 
     print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
 
