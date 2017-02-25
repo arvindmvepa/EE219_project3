@@ -63,3 +63,17 @@ for i in range(n_folds):
     print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
 
 # PART 3
+
+# PART 4
+for k in [10, 50, 100]:
+    nmf = NMF(n_components = k)
+    U = nmf.fit_transform(weight_matrix)
+    V = nmf.components_
+    predicted_weight_matrix = np.dot(U,V)
+
+    error = weight_matrix - predicted_weight_matrix
+    squared_error = np.multiply(error,error)
+    squared_error = np.multiply(weight_matrix, squared_error)
+    sum_squared_error = squared_error.sum().sum()
+
+    print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
