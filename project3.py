@@ -77,3 +77,24 @@ for k in [10, 50, 100]:
     sum_squared_error = squared_error.sum().sum()
 
     print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
+
+# PART 5
+
+# use the rating matrix as the weight matrix this time
+weight_matrix = pd.pivot_table(data, values='rating', index=['userId'], columns=['movieId'], fill_value = 0)
+
+# use matrix of 0s and 1s as rating matrix
+R = weight_matrix.copy()
+R[R > 0] = 1
+
+k = 100
+nmf = NMF(n_components = k)
+U = nmf.fit_transform(R)
+V = nmf.components_
+predicted_rating_matrix = np.dot(U,V)
+
+error = R - predicted_rating_matrix
+squared_error = np.multiply(error,error)
+squared_error = np.multiply(weight_matrix, squared_error)
+sum_squared_error = squared_error.sum().sum()
+print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
