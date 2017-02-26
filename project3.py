@@ -2,6 +2,7 @@ from random import shuffle
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import NMF
+import copy
 
 # PART 1
 dataset = 'ratings.csv'
@@ -10,6 +11,10 @@ data = pd.read_csv(dataset)
 rating_matrix = pd.pivot_table(data, values='rating', index=['userId'], columns=['movieId'], fill_value = 0)
 weight_matrix = rating_matrix.copy()
 weight_matrix[weight_matrix > 0] = 1
+weight_matrix = weight_matrix.astype(int)
+
+rating_matrix = rating_matrix.as_matrix()
+weight_matrix = weight_matrix.as_matrix()
 
 for k in [10, 50, 100]:
     nmf = NMF(n_components = k)
@@ -25,8 +30,7 @@ for k in [10, 50, 100]:
     print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
 
 # PART 2
-weight_matrix_array = np.asarray(weight_matrix)
-indices_known_data = zip(*weight_matrix_array.nonzero()) # (row,column) indices of nonzero elements 
+indices_known_data = zip(*weight_matrix.nonzero()) # (row,column) indices of nonzero elements 
 b = dict(enumerate(indices_known_data))  # creating a dictionary {1:(row,column) 2:(row,column) ... }
 N = range(len(b))   # shuffling 
 shuffle(N)
@@ -44,13 +48,14 @@ k = 100     # k is chosen to be 100 here, in part 1 we used 10, 50 and 100
 error =[]
 
 for i in range(n_folds):   # for all 10 sets(10 folds which has 10000 elements only last set has 10004)
-    temp = np.asarray(weight_matrix)  
+    temp = copy.copy(weight_matrix) 
     keys = m[i]                         # get the keys of known elements in the test set
     for key in keys:                    
         y = indices_known_data[key]     
         p,o = zip(y)                     # get row and column indices of known elements in test set
         temp[p][o] = 0                   # put 0 in the weight_matrix for the elements in test set
-        new_weight_matrix = pd.DataFrame(temp)  
+        
+    new_weight_matrix = temp 
 
     nmf = NMF(n_components=k)
     temp_rating_matrix = np.multiply(new_weight_matrix,rating_matrix)   # get new rating_matrix with known data, elements in test set is extrated 
@@ -62,20 +67,17 @@ for i in range(n_folds):   # for all 10 sets(10 folds which has 10000 elements o
     for key in keys:
         y = indices_known_data[key]
         p,o = zip(y)
-        sum = sum + abs(rating_matrix_array[p][o] - predicted_rating_matrix[p][o])
+        sum = sum + abs(rating_matrix[p][o] - predicted_rating_matrix[p][o])
 
-    if i == 9:
-        sum = sum/10004
-    else:
-        sum = sum/10000
+    sum = sum/(len(m[i]))
 
     error.append(sum)
 
     print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
-    print 'Highest Cross Validation Error: ' + min(error)
-    print 'Lowest Cross Validation Error: ' + max(error)
-    print 'Average Error of 10 folds: ' + np.mean(error)
-
+    
+print 'Highest Cross Validation Error: ' + str(min(error))
+print 'Lowest Cross Validation Error: ' + str(max(error))
+print 'Average Error of 10 folds: ' + str(np.mean(error))
 
 # PART 3
 
