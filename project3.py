@@ -59,17 +59,23 @@ for i in range(n_folds):   # for all 10 sets(10 folds which has 10000 elements o
     predicted_rating_matrix = np.dot(U, V)   # our prediction rating matrix with know elements(known elements in test set extracted)
 
     sum = 0
-    for key in keys:                         # in this for loop the elements , which have the (row,column) indices in the test set elements
-        y = indices_known_data[key]          # are summed. In other words, if we have an known element in the test set which has (row i,column j),
-        p,o = zip(y)                         # we add the element in (row i,column j) from the prediction matrix.
-        sum = sum + predicted_rating_matrix[p][o]     
+    for key in keys:
+        y = indices_known_data[key]
+        p,o = zip(y)
+        sum = sum + abs(rating_matrix_array[p][o] - predicted_rating_matrix[p][o])
 
     if i == 9:
-        error.append(abs(10004 - sum)/10004)     # last set has 10004 known data 
+        sum = sum/10004
     else:
-        error.append(abs(10000 - sum)/10000)     # others have 10000 known data points 
+        sum = sum/10000
+
+    error.append(sum)
 
     print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
+    print 'Highest Cross Validation Error: ' + min(error)
+    print 'Lowest Cross Validation Error: ' + max(error)
+    print 'Average Error of 10 folds: ' + np.mean(error)
+
 
 # PART 3
 
