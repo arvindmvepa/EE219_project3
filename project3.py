@@ -31,6 +31,7 @@ for k in [10, 50, 100]:
 
 # PART 2 & PART 3
 indices_known_data = zip(*weight_matrix.nonzero())
+indices_known_data = zip(*weight_matrix.nonzero())
 b = dict(enumerate(indices_known_data))
 N = range(len(b))
 shuffle(N)
@@ -79,7 +80,7 @@ for i in range(n_folds):
 
     print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
 
-    for s, t in enumerate(threshold_value):
+    for s, threshold in enumerate(threshold_value):
 
         tp = 0  # true positive
         fp = 0  # false positive
@@ -88,26 +89,24 @@ for i in range(n_folds):
         for key in keys:
             y = indices_known_data[key]
             p, o = zip(y)
-            if predicted_rating_matrix[p][o]>t:
-                if rating_matrix [p][o]>t:
+            if predicted_rating_matrix[p][o]>=threshold:
+                if rating_matrix[p][o]>=threshold:
                     tp = tp + 1
                 else:
                     fp = fp + 1
-            elif rating_matrix [p][o]>t:
+            elif rating_matrix [p][o]>=threshold:
                     fn = fn + 1
 
         precision[s, i] = tp / float(tp + fp)  # calculating precision
         recall[s, i] = tp / float(tp + fn)  # calculating recall
 
-    avg_precision = np.mean(precision, axis=1)
-    avg_recall = np.mean(recall, axis=1)
+avg_precision = np.mean(precision, axis=1)
+avg_recall = np.mean(recall, axis=1)
 
-    plt.ylabel('Recall')
-    plt.xlabel('Precision')
-    plt.title('ROC')
-    plt.scatter(avg_precision, avg_recall, s=40, marker='o')
-    plt.plot(avg_precision,avg_recall)
-    plt.show()
+plt.title('ROC')
+plt.scatter(avg_recall, avg_precision, s=40, marker='o')
+plt.plot(avg_recall,avg_precision)
+plt.show()
 
 print 'Highest Cross Validation Error: ' + str(min(error))
 print 'Lowest Cross Validation Error: ' + str(max(error))
