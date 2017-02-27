@@ -5,7 +5,7 @@ from random import shuffle
 import matplotlib.pyplot as plt
 from numpy import linalg
 
-def nmf(rating_mat, k, mask, lambda_reg=0, max_iter=100):
+def nmf(rating_mat, k, mask, lambda_reg, max_iter=100):
 
     eps = 1e-5
 
@@ -44,11 +44,7 @@ rating_matrix = rating_matrix.as_matrix()
 weight_matrix = weight_matrix.as_matrix()
 
 for k in [10, 50, 100]:
-    #nmf = NMF(n_components=k, max_iter=100)
-    #U = nmf.fit_transform(rating_matrix)
-    #V = nmf.components_
-
-    U,V = nmf(rating_matrix,k,weight_matrix)
+    U,V = nmf(rating_matrix,k,weight_matrix,0)
     predicted_rating_matrix = np.dot(U, V)
 
     error = rating_matrix - predicted_rating_matrix
@@ -64,9 +60,9 @@ b = dict(enumerate(indices_known_data))
 N = range(len(b))
 shuffle(N)
 
-threshold_value = np.arange(1, 5, 1)
+threshold_value = np.arange(0, 6, 1)
 n_folds = 10
-k = 100
+k = 10
 error = []
 precision = np.zeros((len(threshold_value), n_folds))
 recall = np.zeros((len(threshold_value), n_folds))
@@ -86,13 +82,7 @@ for i in range(n_folds):
         temp[p][o] = 0
 
     new_weight_matrix = temp
-
-    #nmf = NMF(n_components=k)
-    #temp_rating_matrix = np.multiply(new_weight_matrix, rating_matrix)
-    #U = nmf.fit_transform(temp_rating_matrix)
-    #V = nmf.components_
-
-    U,V = nmf(rating_matrix,k,new_weight_matrix)
+    U,V = nmf(rating_matrix,k,new_weight_matrix,0)
     predicted_rating_matrix = np.dot(U, V)
 
     sum = 0
@@ -118,30 +108,26 @@ for i in range(n_folds):
             y = indices_known_data[key]
             p, o = zip(y)
             if predicted_rating_matrix[p][o] >= threshold:
-                if rating_matrix[p][o] >= threshold:
+                if rating_matrix[p][o] > 3:
                     tp = tp + 1
                 else:
                     fp = fp + 1
             elif predicted_rating_matrix[p][o] < threshold:
-                if rating_matrix[p][o] >= threshold:
+                if rating_matrix[p][o] > 3:
                     fn = fn + 1
                 else:
                     tn = tn + 1
 
-        precision[s, i] = tp / float(tp + fp)  # calculating precision
-        recall[s, i] = tp / float(tp + fn)  # calculating recall
-
-        true_positives[s, i] = tp / float(tp + fn)
-        false_positives[s, i] = fp / float(fp + tn)
+        precision[s, i] = tp / float(tp + fp)
+        recall[s, i] = tp / float(tp + fn)
 
 avg_precision = np.mean(precision, axis=1)
 avg_recall = np.mean(recall, axis=1)
 
-avg_false_positive = np.mean(true_positives, axis=1)
-avg_true_positive = np.mean(false_positives, axis=1)
-
-plt.title('ROC')
+plt.title('ROC for k = %d' %(k))
 plt.plot(avg_recall, avg_precision)
+plt.xlabel('Recall')
+plt.ylabel('Precision')
 plt.show()
 
 print 'Highest Cross Validation Error: ' + str(min(error))
@@ -180,16 +166,16 @@ m = lol(N, 10000)
 m[9] = m[9] + m[10]
 
 lambda_values = [0.01,0.1,1]
+avg_precision = []
+avg_recall = []
 
-for lambda_value in lambda_values:
-    threshold_value = np.arange(1, 5, 1)
+for a,lambda_value in enumerate(lambda_values):
+    threshold_value = np.arange(0, 6, 1)
     n_folds = 10
     k = 100
     error = []
     precision = np.zeros((len(threshold_value), n_folds))
     recall = np.zeros((len(threshold_value), n_folds))
-    true_positives = np.zeros((len(threshold_value), n_folds))
-    false_positives = np.zeros((len(threshold_value), n_folds))
     print 'For lambda: %f' %lambda_value
 
     for i in range(n_folds):
@@ -202,12 +188,6 @@ for lambda_value in lambda_values:
             temp[p][o] = 0
 
         new_weight_matrix = temp
-
-        #nmf = NMF(n_components=k)
-        #temp_rating_matrix = np.multiply(new_weight_matrix, rating_matrix)
-        #U = nmf.fit_transform(temp_rating_matrix)
-        #V = nmf.components_
-
         U,V = nmf(rating_matrix,k,new_weight_matrix,lambda_value)
         predicted_rating_matrix = np.dot(U, V)
 
@@ -234,30 +214,28 @@ for lambda_value in lambda_values:
                 y = indices_known_data[key]
                 p, o = zip(y)
                 if predicted_rating_matrix[p][o] >= threshold:
-                    if rating_matrix[p][o] >= threshold:
+                    if rating_matrix[p][o] > 3:
                         tp = tp + 1
                     else:
                         fp = fp + 1
                 elif predicted_rating_matrix[p][o] < threshold:
-                    if rating_matrix[p][o] >= threshold:
-                      fn = fn + 1
+                    if rating_matrix[p][o] > 3:
+                        fn = fn + 1
                     else:
-                      tn = tn + 1
+                        tn = tn + 1
 
             precision[s, i] = tp / float(tp + fp)  # calculating precision
             recall[s, i] = tp / float(tp + fn)  # calculating recall
 
-            true_positives[s, i] = tp / float(tp + fn)
-            false_positives[s, i] = fp / float(fp + tn)
+    avg_precision.append(np.mean(precision, axis=1))
+    avg_recall.append(np.mean(recall, axis=1))
 
-    avg_precision = np.mean(precision, axis=1)
-    avg_recall = np.mean(recall, axis=1)
-
-    avg_false_positive = np.mean(false_positives, axis=1)
-    avg_true_positive = np.mean(true_positives, axis=1)
-
-    plt.title('ROC')
-    plt.plot(avg_false_positive[::-1], avg_true_positive[::-1])
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot(111)
+    ax1.plot(avg_recall[a], avg_precision[a])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('ROC for k = %d & lambda = %f' %(k) %(lambda_value))
     plt.show()
 
 # PART 5
