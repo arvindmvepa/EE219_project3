@@ -1,50 +1,80 @@
-from random import shuffle
+import copy
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import NMF
-import copy
+from random import shuffle
+import matplotlib.pyplot as plt
+from numpy import linalg
+
+def nmf(rating_mat, k, mask, lambda_reg=0, max_iter=100):
+
+    eps = 1e-5
+
+    rows, columns = rating_mat.shape
+    U = np.random.rand(rows, k)
+    U = np.maximum(U, eps)
+
+    V = linalg.lstsq(U, rating_mat)[0]
+    V = np.maximum(V, eps)
+
+    masked_X = mask * rating_matrix
+
+    for i in range(1, max_iter + 1):
+
+        top = np.dot(masked_X, V.T)
+        bottom = (np.add(np.dot((mask * np.dot(U, V)), V.T), lambda_reg * U)) + eps
+        U *= top / bottom
+        U = np.maximum(U, eps)
+
+        top = np.dot(U.T, masked_X)
+        bottom = np.add(np.dot(U.T, mask * np.dot(U, V)), lambda_reg * V) + eps
+        V *= top / bottom
+        V = np.maximum(V, eps)
+
+    return U,V
 
 # PART 1
 dataset = 'ratings.csv'
 data = pd.read_csv(dataset)
 
-rating_matrix = pd.pivot_table(data, values='rating', index=['userId'], columns=['movieId'], fill_value = 0)
+rating_matrix = data.pivot_table(index=['userId'], columns=['movieId'], values='rating', fill_value=0)
 weight_matrix = rating_matrix.copy()
 weight_matrix[weight_matrix > 0] = 1
-weight_matrix = weight_matrix.astype(int)
 
 rating_matrix = rating_matrix.as_matrix()
 weight_matrix = weight_matrix.as_matrix()
 
 for k in [10, 50, 100]:
-    nmf = NMF(n_components = k)
-    U = nmf.fit_transform(rating_matrix)
-    V = nmf.components_
-    predicted_rating_matrix = np.dot(U,V)
+    #nmf = NMF(n_components=k, max_iter=100)
+    #U = nmf.fit_transform(rating_matrix)
+    #V = nmf.components_
+
+    U,V = nmf(rating_matrix,k,weight_matrix)
+    predicted_rating_matrix = np.dot(U, V)
 
     error = rating_matrix - predicted_rating_matrix
     squared_error = np.multiply(error,error)
     squared_error = np.multiply(weight_matrix, squared_error)
-    sum_squared_error = squared_error.sum().sum()
+    sum_squared_error = sum(sum(squared_error))
 
-    print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
+    print 'Least Squares Error for k = %d: ' % k + str(sum_squared_error)
 
 # PART 2 & PART 3
-indices_known_data = zip(*weight_matrix.nonzero())
 indices_known_data = zip(*weight_matrix.nonzero())
 b = dict(enumerate(indices_known_data))
 N = range(len(b))
 shuffle(N)
 
-threshold_value = np.arange(1, 6, 1)
+threshold_value = np.arange(1, 5, 1)
 n_folds = 10
 k = 100
-error =[]
-precision = np.zeros((len(threshold_value),n_folds))
-recall = np.zeros((len(threshold_value),n_folds))
+error = []
+precision = np.zeros((len(threshold_value), n_folds))
+recall = np.zeros((len(threshold_value), n_folds))
+true_positives = np.zeros((len(threshold_value), n_folds))
+false_positives = np.zeros((len(threshold_value), n_folds))
 
-lol = lambda lst, sz: [lst[i:i+sz] for i in range(0, len(lst), sz)]
-m = lol(N,10000)
+lol = lambda lst, sz: [lst[i:i + sz] for i in range(0, len(lst), sz)]
+m = lol(N, 10000)
 m[9] = m[9] + m[10]
 
 for i in range(n_folds):
@@ -52,60 +82,66 @@ for i in range(n_folds):
     keys = m[i]
     for key in keys:
         y = indices_known_data[key]
-        p,o = zip(y)
+        p, o = zip(y)
         temp[p][o] = 0
 
     new_weight_matrix = temp
 
-    nmf = NMF(n_components = k)
-    temp_rating_matrix = np.multiply(new_weight_matrix,rating_matrix)
+    #nmf = NMF(n_components=k)
+    #temp_rating_matrix = np.multiply(new_weight_matrix, rating_matrix)
+    #U = nmf.fit_transform(temp_rating_matrix)
+    #V = nmf.components_
 
-    U = nmf.fit_transform(temp_rating_matrix)
-    V = nmf.components_
-    #U,V = nmf(rating_matrix,k,new_weight_matrix)
+    U,V = nmf(rating_matrix,k,new_weight_matrix)
     predicted_rating_matrix = np.dot(U, V)
-
-    #error = su(rating_matrix-predicted_rating_matrix)/ len(m[i])
-    #abs( R_predicted[test_data[j][0] - 1, test_data[j][1] - 1] - test_data[j][2] )
 
     sum = 0
     for key in keys:
         y = indices_known_data[key]
-        p,o = zip(y)
+        p, o = zip(y)
         sum = sum + abs(rating_matrix[p][o] - predicted_rating_matrix[p][o])
 
-    sum = sum/(len(m[i]))
+    sum = sum / (len(m[i]))
 
     error.append(sum)
 
-    print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
+    print 'Testing Error in Fold-%d: ' % (i + 1) + str(error[i])
 
     for s, threshold in enumerate(threshold_value):
 
         tp = 0  # true positive
+        tn = 0  # true negative
         fp = 0  # false positive
         fn = 0  # false negative
 
         for key in keys:
             y = indices_known_data[key]
             p, o = zip(y)
-            if predicted_rating_matrix[p][o]>=threshold:
-                if rating_matrix[p][o]>=threshold:
+            if predicted_rating_matrix[p][o] >= threshold:
+                if rating_matrix[p][o] >= threshold:
                     tp = tp + 1
                 else:
                     fp = fp + 1
-            elif rating_matrix [p][o]>=threshold:
+            elif predicted_rating_matrix[p][o] < threshold:
+                if rating_matrix[p][o] >= threshold:
                     fn = fn + 1
+                else:
+                    tn = tn + 1
 
         precision[s, i] = tp / float(tp + fp)  # calculating precision
         recall[s, i] = tp / float(tp + fn)  # calculating recall
 
+        true_positives[s, i] = tp / float(tp + fn)
+        false_positives[s, i] = fp / float(fp + tn)
+
 avg_precision = np.mean(precision, axis=1)
 avg_recall = np.mean(recall, axis=1)
 
+avg_false_positive = np.mean(true_positives, axis=1)
+avg_true_positive = np.mean(false_positives, axis=1)
+
 plt.title('ROC')
-plt.scatter(avg_recall, avg_precision, s=40, marker='o')
-plt.plot(avg_recall,avg_precision)
+plt.plot(avg_recall, avg_precision)
 plt.show()
 
 print 'Highest Cross Validation Error: ' + str(min(error))
