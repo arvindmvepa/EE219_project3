@@ -29,39 +29,43 @@ for k in [10, 50, 100]:
 
     print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
 
-# PART 2
-indices_known_data = zip(*weight_matrix.nonzero()) # (row,column) indices of nonzero elements 
-b = dict(enumerate(indices_known_data))  # creating a dictionary {1:(row,column) 2:(row,column) ... }
-N = range(len(b))   # shuffling 
+# PART 2 & PART 3
+indices_known_data = zip(*weight_matrix.nonzero())
+b = dict(enumerate(indices_known_data))
+N = range(len(b))
 shuffle(N)
 
+threshold_value = np.arange(1, 6, 1)
+n_folds = 10
+k = 100
+error =[]
+precision = np.zeros((len(threshold_value),n_folds))
+recall = np.zeros((len(threshold_value),n_folds))
 
-# dividing known points into ten sets after shuffling, take 10004 points for the last set
 lol = lambda lst, sz: [lst[i:i+sz] for i in range(0, len(lst), sz)]
 m = lol(N,10000)
 m[9] = m[9] + m[10]
 
+for i in range(n_folds):
+    temp = copy.copy(weight_matrix)
+    keys = m[i]
+    for key in keys:
+        y = indices_known_data[key]
+        p,o = zip(y)
+        temp[p][o] = 0
 
+    new_weight_matrix = temp
 
-n_folds = 10
-k = 100     # k is chosen to be 100 here, in part 1 we used 10, 50 and 100
-error =[]
+    nmf = NMF(n_components = k)
+    temp_rating_matrix = np.multiply(new_weight_matrix,rating_matrix)
 
-for i in range(n_folds):   # for all 10 sets(10 folds which has 10000 elements only last set has 10004)
-    temp = copy.copy(weight_matrix) 
-    keys = m[i]                         # get the keys of known elements in the test set
-    for key in keys:                    
-        y = indices_known_data[key]     
-        p,o = zip(y)                     # get row and column indices of known elements in test set
-        temp[p][o] = 0                   # put 0 in the weight_matrix for the elements in test set
-        
-    new_weight_matrix = temp 
-
-    nmf = NMF(n_components=k)
-    temp_rating_matrix = np.multiply(new_weight_matrix,rating_matrix)   # get new rating_matrix with known data, elements in test set is extrated 
-    U = nmf.fit_transform(temp_rating_matrix)                 
+    U = nmf.fit_transform(temp_rating_matrix)
     V = nmf.components_
-    predicted_rating_matrix = np.dot(U, V)   # our prediction rating matrix with know elements(known elements in test set extracted)
+    #U,V = nmf(rating_matrix,k,new_weight_matrix)
+    predicted_rating_matrix = np.dot(U, V)
+
+    #error = su(rating_matrix-predicted_rating_matrix)/ len(m[i])
+    #abs( R_predicted[test_data[j][0] - 1, test_data[j][1] - 1] - test_data[j][2] )
 
     sum = 0
     for key in keys:
@@ -74,12 +78,40 @@ for i in range(n_folds):   # for all 10 sets(10 folds which has 10000 elements o
     error.append(sum)
 
     print 'Testing Error in Fold-%d: ' %(i+1) + str(error[i])
-    
+
+    for s, t in enumerate(threshold_value):
+
+        tp = 0  # true positive
+        fp = 0  # false positive
+        fn = 0  # false negative
+
+        for key in keys:
+            y = indices_known_data[key]
+            p, o = zip(y)
+            if predicted_rating_matrix[p][o]>t:
+                if rating_matrix [p][o]>t:
+                    tp = tp + 1
+                else:
+                    fp = fp + 1
+            elif rating_matrix [p][o]>t:
+                    fn = fn + 1
+
+        precision[s, i] = tp / float(tp + fp)  # calculating precision
+        recall[s, i] = tp / float(tp + fn)  # calculating recall
+
+    avg_precision = np.mean(precision, axis=1)
+    avg_recall = np.mean(recall, axis=1)
+
+    plt.ylabel('Recall')
+    plt.xlabel('Precision')
+    plt.title('ROC')
+    plt.scatter(avg_precision, avg_recall, s=40, marker='o')
+    plt.plot(avg_precision,avg_recall)
+    plt.show()
+
 print 'Highest Cross Validation Error: ' + str(min(error))
 print 'Lowest Cross Validation Error: ' + str(max(error))
 print 'Average Error of 10 folds: ' + str(np.mean(error))
-
-# PART 3
 
 # PART 4
 for k in [10, 50, 100]:
