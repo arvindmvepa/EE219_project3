@@ -281,9 +281,9 @@ m[9] = m[9] + m[10]
 
 n_folds = 10
 k = 100
-L = 5
+L = [1,3,5]
 
-precision = np.zeros(n_folds)
+precision = np.zeros((len(L),n_folds))
 
 for i in range(n_folds):
     temp = copy.copy(rating_matrix)
@@ -298,27 +298,34 @@ for i in range(n_folds):
     U,V = nmf(weight_matrix,k,new_weight_matrix)
     predicted_rating_matrix = np.dot(U, V)
 
-    tp = 0  # true positive
-    fp = 0  # false positive
+    # sort by the predicted ratings and actual ratings matrices for each user
+    # store the original indices of the sorted elements
+    recs = np.zeros(predicted_rating_matrix.shape)
+    actual = np.zeros(rating_matrix.shape)
+    for row in range(predicted_rating_matrix.shape[0]):
+        recs[row,:] = predicted_rating_matrix[row,:].argsort()
+        actual[row,:] = rating_matrix[row,:].argsort()
 
-    # get the indices of the top L movie recs by choosing ones with highest ratings
-    top_five_recs = np.argsort(predicted_rating_matrix,axis=1)[:,(-1 * L):]
+    for l in range(len(L)):
+        tp = 0  # true positive
+        fp = 0  # false positive
 
-    # get the indices of the actual L movies with highest ratings
-    top_five_actual = np.argsort(rating_matrix, axis=1)[:,(-1 * L):]
+        # get the top L recommendations and top L actual values
+        top_recs = recs[:,(-1 * L[l]):]
+        top_actual = actual[:,(-1 * L[l]):]
 
-    # for each user
-    for j in range(top_five_recs.shape[0]):
-        # count the number of true positives, i.e. recs correctly guessed
-        tp += sum(i in top_five_actual[j,:] for i in top_five_recs[j,:])
+        # for each user
+        for j in range(top_recs.shape[0]):
+            # count the number of true positives, i.e. recs correctly guessed
+            tp += sum(i in top_actual[j,:] for i in top_recs[j,:])
 
-        # count the number of false positives, i.e. movies that were rated by the user,
-        # but do not appear in his top 5, we exclude unknown data from fp count
-        fp += sum(i not in top_five_actual[j,:] and (j,i) in indices_known_data for i in top_five_recs[j,:])
+            # count the number of false positives, i.e. movies that were rated by the user,
+            # but do not appear in his top 5, we exclude unknown data from fp count
+            fp += sum(i not in top_actual[j,:] and (j,i) in indices_known_data for i in top_recs[j,:])
 
-    precision[i] = tp / float(tp + fp)  # calculating precision
-    print 'Precision in Fold-%d for L = 5: ' %(i + 1) + str(precision[i])
+        precision[l, i] = tp / max(1, float(tp + fp))  # we take max between 1 and the positives to avoid undefined
 
-avg_precision = np.mean(precision)
+avg_precision = np.mean(precision, axis=1)
 
-print 'Average Precision for L = 5: ' + str(avg_precision)
+for l in range(len(L)):
+    print 'Average Precision for L = %d: ' %(L(l)) + str(avg_precision[l])
