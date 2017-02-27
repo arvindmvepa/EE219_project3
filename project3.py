@@ -261,22 +261,64 @@ for lambda_value in lambda_values:
     plt.show()
 
 # PART 5
+dataset = 'ratings.csv'
+data = pd.read_csv(dataset)
 
-# use the rating matrix as the weight matrix this time
-weight_matrix = pd.pivot_table(data, values='rating', index=['userId'], columns=['movieId'], fill_value = 0)
+rating_matrix = data.pivot_table(index=['userId'], columns=['movieId'], values='rating', fill_value=0)
+weight_matrix = rating_matrix.copy()
+weight_matrix[weight_matrix > 0] = 1
 
-# use matrix of 0s and 1s as rating matrix
-R = weight_matrix.copy()
-R[R > 0] = 1
+rating_matrix = rating_matrix.as_matrix()
+weight_matrix = weight_matrix.as_matrix()
 
+indices_known_data = zip(*weight_matrix.nonzero())
+b = dict(enumerate(indices_known_data))
+N = range(len(b))
+shuffle(N)
+lol = lambda lst, sz: [lst[i:i + sz] for i in range(0, len(lst), sz)]
+m = lol(N, 10000)
+m[9] = m[9] + m[10]
+
+n_folds = 10
 k = 100
-nmf = NMF(n_components = k)
-U = nmf.fit_transform(R)
-V = nmf.components_
-predicted_rating_matrix = np.dot(U,V)
+L = 5
 
-error = R - predicted_rating_matrix
-squared_error = np.multiply(error,error)
-squared_error = np.multiply(weight_matrix, squared_error)
-sum_squared_error = squared_error.sum().sum()
-print 'Least Squares Error for k = %d: ' %k + str(sum_squared_error)
+precision = np.zeros(n_folds)
+
+for i in range(n_folds):
+    temp = copy.copy(rating_matrix)
+    keys = m[i]
+    for key in keys:
+        y = indices_known_data[key]
+        p, o = zip(y)
+        temp[p][o] = 0
+
+    new_weight_matrix = temp
+
+    U,V = nmf(weight_matrix,k,new_weight_matrix)
+    predicted_rating_matrix = np.dot(U, V)
+
+    tp = 0  # true positive
+    fp = 0  # false positive
+
+    # get the indices of the top L movie recs by choosing ones with highest ratings
+    top_five_recs = np.argsort(predicted_rating_matrix,axis=1)[:,(-1 * L):]
+
+    # get the indices of the actual L movies with highest ratings
+    top_five_actual = np.argsort(rating_matrix, axis=1)[:,(-1 * L):]
+
+    # for each user
+    for j in range(top_five_recs.shape[0]):
+        # count the number of true positives, i.e. recs correctly guessed
+        tp += sum(i in top_five_actual[j,:] for i in top_five_recs[j,:])
+
+        # count the number of false positives, i.e. movies that were rated by the user,
+        # but do not appear in his top 5, we exclude unknown data from fp count
+        fp += sum(i not in top_five_actual[j,:] and (j,i) in indices_known_data for i in top_five_recs[j,:])
+
+    precision[i] = tp / float(tp + fp)  # calculating precision
+    print 'Precision in Fold-%d for L = 5: ' %(i + 1) + str(precision[i])
+
+avg_precision = np.mean(precision)
+
+print 'Average Precision for L = 5: ' + str(avg_precision)
