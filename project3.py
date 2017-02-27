@@ -306,13 +306,13 @@ for i in range(n_folds):
         recs[row,:] = predicted_rating_matrix[row,:].argsort()
         actual[row,:] = rating_matrix[row,:].argsort()
 
-    for l in range(len(L)):
+    for g in range(len(L)):
         tp = 0  # true positive
         fp = 0  # false positive
 
         # get the top L recommendations and top L actual values
-        top_recs = recs[:,(-1 * L[l]):]
-        top_actual = actual[:,(-1 * L[l]):]
+        top_recs = recs[:,(-1 * L[g]):]
+        top_actual = actual[:,(-1 * L[g]):]
 
         # for each user
         for j in range(top_recs.shape[0]):
@@ -323,9 +323,10 @@ for i in range(n_folds):
             # but do not appear in his top 5, we exclude unknown data from fp count
             fp += sum(i not in top_actual[j,:] and (j,i) in indices_known_data for i in top_recs[j,:])
 
-        precision[l, i] = tp / max(1, float(tp + fp))  # we take max between 1 and the positives to avoid undefined
+        precision[g][i] = tp / max(1, float(tp + fp))  # we take max between 1 and the positives to avoid undefined
+        # print 'Precision in Fold-%d (L=%d): ' % (i + 1, L[g]) + str(precision[g][i])
 
 avg_precision = np.mean(precision, axis=1)
 
-for l in range(len(L)):
-    print 'Average Precision for L = %d: ' %(L(l)) + str(avg_precision[l])
+for g in range(len(L)):
+    print 'Average Precision for L = %d: ' %(L[g]) + str(avg_precision[g])
