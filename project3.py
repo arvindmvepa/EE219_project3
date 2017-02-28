@@ -31,7 +31,7 @@ def nmf(rating_mat, k, mask, lambda_reg, max_iter=100):
         V = np.maximum(V, eps)
 
     return U,V
-"""
+
 # PART 1
 dataset = 'ratings.csv'
 data = pd.read_csv(dataset)
@@ -133,7 +133,7 @@ plt.show()
 print 'Highest Cross Validation Error: ' + str(min(error))
 print 'Lowest Cross Validation Error: ' + str(max(error))
 print 'Average Error of 10 folds: ' + str(np.mean(error))
-"""
+
 # PART 4
 dataset = 'ratings.csv'
 data = pd.read_csv(dataset)
@@ -262,6 +262,8 @@ k = 100
 L = [1,3,5]
 
 precision = np.zeros((len(L),n_folds))
+hit_rate = np.zeros((len(L), n_folds))
+false_alarm_rate = np.zeros((len(L), n_folds))
 
 for i in range(n_folds):
     temp = copy.copy(rating_matrix)
@@ -273,16 +275,13 @@ for i in range(n_folds):
 
     new_weight_matrix = temp
 
-    U,V = nmf(weight_matrix,k,new_weight_matrix)
+    U,V = nmf(weight_matrix,k,new_weight_matrix,0)
     predicted_rating_matrix = np.dot(U, V)
 
     # sort by the predicted ratings and actual ratings matrices for each user
     # store the original indices of the sorted elements
-    recs = np.zeros(predicted_rating_matrix.shape)
-    actual = np.zeros(rating_matrix.shape)
-    for row in range(predicted_rating_matrix.shape[0]):
-        recs[row,:] = predicted_rating_matrix[row,:].argsort()
-        actual[row,:] = rating_matrix[row,:].argsort()
+    recs = np.argsort(predicted_rating_matrix, axis=1)
+    actual = np.argsort(rating_matrix, axis=1)
 
     for g in range(len(L)):
         tp = 0  # true positive
@@ -293,7 +292,7 @@ for i in range(n_folds):
         top_actual = actual[:,(-1 * L[g]):]
 
         # for each user
-        for j in range(top_recs.shape[0]):
+        for j in xrange(top_recs.shape[0]):
             # count the number of true positives, i.e. recs correctly guessed
             tp += sum(i in top_actual[j,:] for i in top_recs[j,:])
 
@@ -304,7 +303,40 @@ for i in range(n_folds):
         precision[g][i] = tp / max(1, float(tp + fp))  # we take max between 1 and the positives to avoid undefined
         # print 'Precision in Fold-%d (L=%d): ' % (i + 1, L[g]) + str(precision[g][i])
 
+        threshold = 4
+        tp = 0
+        fp = 0
+        liked_count = 0
+        disliked_count = 0
+
+        # sum all the 'liked' movies and 'disliked' movies in the test data
+        # and compute the number of true positives and false positives
+        for key in keys:
+            y = indices_known_data[key]
+            p, o = zip(y)
+
+            if rating_matrix[p][o] >= threshold:
+                liked_count += 1
+                if o in top_recs[p]:
+                    tp = tp + 1
+            elif rating_matrix[p][o] > 0: # ignore 0s because they are unknown
+                disliked_count += 1
+                if o in top_recs[p]:
+                    fp = fp + 1
+
+        hit_rate[g][i] = tp / max(1, float(liked_count))
+        false_alarm_rate[g][i] = fp / max(1, float(disliked_count))
+
 avg_precision = np.mean(precision, axis=1)
+avg_hit_rate = np.mean(hit_rate, axis=1)
+avg_false_alarm_rate = np.mean(false_alarm_rate, axis=1)
 
 for g in range(len(L)):
     print 'Average Precision for L = %d: ' %(L[g]) + str(avg_precision[g])
+    plt.scatter(avg_false_alarm_rate[g], avg_hit_rate[g], label='Label=%d' %(L[g]))
+
+plt.xlabel('False-Alarm Rate')
+plt.ylabel('Hit Rate')
+plt.title('Hit Rate Vs. False-Alarm Rate')
+plt.legend('upper right')
+plt.show()
