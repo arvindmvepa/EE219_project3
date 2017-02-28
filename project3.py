@@ -31,7 +31,7 @@ def nmf(rating_mat, k, mask, lambda_reg, max_iter=100):
         V = np.maximum(V, eps)
 
     return U,V
-
+"""
 # PART 1
 dataset = 'ratings.csv'
 data = pd.read_csv(dataset)
@@ -133,7 +133,7 @@ plt.show()
 print 'Highest Cross Validation Error: ' + str(min(error))
 print 'Lowest Cross Validation Error: ' + str(max(error))
 print 'Average Error of 10 folds: ' + str(np.mean(error))
-
+"""
 # PART 4
 dataset = 'ratings.csv'
 data = pd.read_csv(dataset)
@@ -149,10 +149,10 @@ for k in [10, 50, 100]:
     U,V = nmf(weight_matrix,k,rating_matrix,0)
     predicted_rating_matrix = np.dot(U, V)
 
-    error = weight_matrix - predicted_rating_matrix
+    error = rating_matrix - predicted_rating_matrix
     squared_error = np.multiply(error,error)
     squared_error = np.multiply(rating_matrix, squared_error)
-    sum_squared_error = sum(sum(squared_error))
+    sum_squared_error = squared_error.sum().sum()
 
     print 'Least Squares Error (Weights - Ratings changed) for k = %d: ' % k + str(sum_squared_error)
 
@@ -235,7 +235,7 @@ for a,lambda_value in enumerate(lambda_values):
     ax1.plot(avg_recall[a], avg_precision[a])
     plt.xlabel('Recall')
     plt.ylabel('Precision')
-    plt.title('ROC for k = %d & lambda = %f' %(k) %(lambda_value))
+    plt.title('ROC for k = %d & lambda = %f' % (k, lambda_value))
     plt.show()
 
 # PART 5
